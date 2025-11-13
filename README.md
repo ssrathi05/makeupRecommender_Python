@@ -12,6 +12,7 @@ A Python-based data analytics and recommendation system built using Sephora's be
 ## Tech
 Python, Pandas, NumPy, Scikit-learn, Seaborn, Streamlit
 
+
 ## How to Run
 pip install -r requirements.txt
 streamlit run app.py
