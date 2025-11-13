@@ -36,15 +36,72 @@ except Exception as e:
     st.error(f"Error loading data: {str(e)}")
     st.stop()
 
-# Product selection dropdown
-st.subheader("Select a Product")
-product_names = sorted(df['Name'].unique().tolist())
-selected_product = st.selectbox(
-    "Choose a product:",
-    options=product_names,
-    index=0,
-    help="Select a product to find similar recommendations"
+# Product search interface
+st.subheader("Search for a Product")
+st.markdown("💡 **Tip:** Type keywords like 'wrinkle cream', 'estee lauder', 'moisturizer', etc.")
+
+# Search input
+search_query = st.text_input(
+    "Search by product name or brand:",
+    placeholder="e.g., 'wrinkle cream', 'estee lauder', 'moisturizer'",
+    help="Type any part of the product name or brand to find matches"
 )
+
+# Create a searchable product list
+def search_products(df, query):
+    """Search products by brand or name."""
+    if not query or query.strip() == '':
+        return pd.DataFrame()
+    
+    query_lower = query.lower().strip()
+    # Search in both Brand and Name columns
+    mask = (
+        df['Brand'].str.lower().str.contains(query_lower, na=False) |
+        df['Name'].str.lower().str.contains(query_lower, na=False)
+    )
+    results = df[mask].copy()
+    
+    # Create a display format: "Brand - Name"
+    results['display'] = results['Brand'] + ' - ' + results['Name']
+    
+    return results[['Brand', 'Name', 'display', 'Price']].head(20)  # Limit to 20 results
+
+# Show search results
+selected_product = None
+search_results = pd.DataFrame()
+
+if search_query:
+    search_results = search_products(df, search_query)
+    
+    if not search_results.empty:
+        st.markdown(f"**Found {len(search_results)} matching product(s):**")
+        
+        # Create a selectbox with filtered results
+        display_options = search_results['display'].tolist()
+        selected_display = st.selectbox(
+            "Select a product:",
+            options=display_options,
+            index=0,
+            help="Choose from the filtered results"
+        )
+        
+        # Extract the actual product name from selection
+        if selected_display:
+            selected_row = search_results[search_results['display'] == selected_display].iloc[0]
+            selected_product = selected_row['Name']
+            
+            # Show selected product preview
+            col1, col2 = st.columns([3, 1])
+            with col1:
+                st.info(f"**Selected:** {selected_row['Brand']} - {selected_row['Name']}")
+            with col2:
+                if pd.notna(selected_row['Price']):
+                    st.metric("Price", f"${selected_row['Price']:.2f}")
+    else:
+        st.warning(f"❌ No products found matching '{search_query}'. Try different keywords!")
+        st.caption("💡 Try searching for: brand names, product types (moisturizer, serum, cream), or specific features")
+else:
+    st.info("👆 Start typing to search for products...")
 
 # Number of recommendations
 top_n = st.slider(
@@ -56,8 +113,9 @@ top_n = st.slider(
 )
 
 # Get recommendations
-if st.button("Get Recommendations", type="primary"):
-    if selected_product:
+if selected_product:
+    st.markdown("---")
+    if st.button("Get Recommendations", type="primary", use_container_width=True):
         with st.spinner("Finding similar products..."):
             recommendations = recommender.recommend(selected_product, top_n=top_n)
         
@@ -86,8 +144,9 @@ if st.button("Get Recommendations", type="primary"):
                 
                 if pd.notna(selected_info['Ingredients']) and selected_info['Ingredients']:
                     st.text_area("Ingredients", selected_info['Ingredients'], height=100)
-    else:
-        st.warning("Please select a product first.")
+elif search_query and not search_results.empty:
+    st.markdown("---")
+    st.info("👆 Select a product above and click 'Get Recommendations' to see similar items!")
 
 # Footer
 st.markdown("---")
